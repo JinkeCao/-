@@ -1,0 +1,190 @@
+# -*- coding: utf-8 -*-
+"""
+Created on Sun Dec 25 17:37:45 2022
+
+@author: ckcao
+"""
+
+
+# from kafka import KafkaProducer
+from json import dump
+from random import choice
+from urllib.request import Request, urlopen
+from bs4 import BeautifulSoup
+from time import sleep#, mktime, strptime
+from selenium import webdriver
+from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+from func_timeout import func_set_timeout, FunctionTimedOut
+
+def genHeader():
+    headerset = [
+        {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.5112.102 Safari/537.36 Edg/104.0.1293.70'
+            }
+        , {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Safari/537.36'
+            }
+        , {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:103.0) Gecko/20100101 Firefox/103.0'
+            }
+        ]
+    return choice(headerset)
+
+def link2bs(link):
+    req = Request(
+        link
+        , headers=genHeader()
+        )
+    res = urlopen(
+        req
+        , timeout = 59
+        ).read()
+    return BeautifulSoup(
+        res
+        , features="lxml"
+        )
+
+@func_set_timeout(333)
+def link2bso(link):
+    try:
+        capa = DesiredCapabilities.CHROME
+        capa["pageLoadStrategy"] = "none"
+        
+        driver = webdriver.Chrome(
+            r'C:\Users\ckcao\Downloads\chromedriver.exe'
+            , desired_capabilities=capa
+            )
+        driver.get(
+            link
+            )
+        sleep(33)
+        driver.execute_script(
+            "window.stop();"
+            )
+        bso = BeautifulSoup(
+            driver.page_source
+            , features="lxml"
+            )
+        driver.quit()
+        return bso
+    except Exception as e:
+        driver.quit()
+        return BeautifulSoup(
+            str(e)
+            # , features="lxml"
+            )
+        
+
+def timered_link2bso(link):
+    try: bso = link2bso(link)
+    except FunctionTimedOut: bso = BeautifulSoup(
+        'timesout'
+        , features="lxml"
+        )
+    except Exception as e:
+        bso = BeautifulSoup(
+            str(e)
+            # , features="lxml"
+            )
+    return bso
+
+def path_cleaner(path):
+    for c in r'<>/\|:*? ': path = path.replace(c, '_')
+    return path
+
+l = lambda y: int(y) if y.isdigit() else 0
+a = 'https://www.thepaper.cn'
+for b in BeautifulSoup(
+    open(
+        r'F:\Users\Administrator\Documents\2022认知组前瞻预研\thepaper.html'
+        , 'r'
+        , encoding='utf8'
+        ).read()
+    , features="lxml"
+    ).find_all(
+        class_='small_toplink__GmZhY'
+        ):
+    try:
+        b = b.find('a')['href']
+        print(b)
+        if 'newsDetail' not in b:
+            sleep(9)
+            continue
+        
+        ab = timered_link2bso(a+b)
+        cc = [
+              c for c in ab.stripped_strings
+              ]
+        d = {
+            'likes': cc[11]
+            , 'title': cc[12]
+            , 'source': cc[13]
+            , 'time': cc[14]
+            , 'text': cc[cc.index('字号') +1: cc.index('责任编辑：')]
+            , 'comments': [
+                {
+                    'screen_name': c[0]
+                    , 'reply': c[1]
+                    , 'date': c[2].split(' ∙ ')[0]
+                    , 'address': c[2].split(' ∙ ')[-1]
+                    , 'approve': l(c[3])
+                    , 'reply_to_object':[]
+                    }
+                if '：' not in c
+                else {
+                    'screen_name': c[0]
+                    , 'reply': c[1]
+                    , 'date': c[2].split(' ∙ ')[0]
+                    , 'address': c[2].split(' ∙ ')[-1]
+                    , 'approve': l(c[3])
+                    , 'reply_to_object':[
+                        {
+                            'screen_name': c[c.index(x) - 1]
+                            , 'reply': c[c.index(x) + 1]
+                            , 'date': c[c.index(x) + 2].split(' ∙ ')[0]
+                            ,'address': c[c.index(x) + 2].split(' ∙ ')[-1]
+                            , 'approve': l(c[3])
+                            }
+                        for x in c
+                        if '：' == x[0]
+                        ]
+                    }
+                for c in [
+                        [
+                            s for s in c.stripped_strings
+                            ] for c in ab.find_all(
+                                class_='ant-comment index_costomComment__b6gaa'
+                                )
+                            ]
+                        ]
+                    }
+        with open(
+                r'F:\Users\Administrator\Documents\2022认知组前瞻预研\thepaper'
+                + '//'
+                + path_cleaner(
+                    cc[12]
+                    )
+                + '.json'
+                , 'a'
+                , encoding='utf8'
+                ) as f:
+            dump(
+                d
+                , fp = f
+                , ensure_ascii= False
+                , indent=True
+                )
+            print(
+                ''
+                ,file=f
+                )
+    except Exception as e:
+        print(str(e))
+    finally:
+        sleep(9)
+        continue
+        
