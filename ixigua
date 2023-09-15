@@ -1,0 +1,128 @@
+video_id=[
+    7255931670082257442,
+    7254962466436678178
+]
+
+# -*- coding: utf-8 -*-
+"""
+Created on Fri Sep 15 16:46:16 2023
+
+@author: Administrator
+"""
+from bs4 import BeautifulSoup
+from json import dump
+from time import sleep
+from urllib.request import urlretrieve#Request, urlopen
+#from random import choice
+from urllib.parse import urlencode
+from selenium import webdriver
+# from selenium.webdriver.common.desired_capabilities import DesiredCapabilities
+from func_timeout import func_set_timeout, FunctionTimedOut
+from os.path import abspath, join
+from datetime import date
+from os import makedirs
+from selenium.webdriver.common.by import By
+from selenium.webdriver.common.keys import Keys
+
+@func_set_timeout(99)
+def link2bso(link):
+    # capa = DesiredCapabilities.CHROME
+    # capa["pageLoadStrategy"] = "none"
+    o = webdriver.ChromeOptions()
+    o.add_argument("--ignore-certificate-error")
+    o.add_argument("--ignore-ssl-errors")
+    driver = webdriver.Chrome(
+        # r'C:\Users\Administrator\Documents\chrome-win64\chromedriver.exe'
+        # , 
+        # desired_capabilities=capa
+        # ,
+        options = o
+    )
+    try:
+        driver.get(
+            link
+            )
+        sleep(9)
+        driver.execute_script(
+            "window.stop();"
+            )
+        driver.find_element(
+            By.TAG_NAME,
+            'body'
+        ).send_keys(
+            Keys.PAGE_DOWN
+        )
+        sleep(9)
+        bso = driver.page_source
+        # driver.quit()
+        # return bso
+    except Exception as e:
+        # driver.quit()
+        bso = str(e)
+    finally:
+        driver.quit()
+        return bso
+    
+def timered_link2bso(link):
+    try:
+        bso = link2bso(
+            link
+        )
+    except FunctionTimedOut:
+        bso = 'TimedOut 99 secs',
+    except Exception as e:
+        bso = str(
+            e
+        )
+    finally:
+        return BeautifulSoup(
+            bso,
+            features='lxml'
+        )
+
+for i in video_id:
+    try:
+        with open(
+            join(
+                abspath(
+                    'C:\\Users\\Administrator\\Documents\\ixigua'
+                ),
+                str(
+                    i
+                )+'_video.txt' 
+            ),
+            'w',
+            encoding='utf8'
+        ) as f:
+            print(
+                timered_link2bso(
+                    'https://www.ixigua.com/' + str(
+                        i
+                    )
+                ).select(
+                    'head > script:nth-child(82)'
+                )[
+                    0
+                ].get_text(),
+                file=f
+            )
+        sleep(
+            9
+        )
+        urlretrieve(
+            'https://www.ixigua.com/tlb/comment/article/v5/tab_comments/?group_id={}&item_id={}'.format(
+                i,
+                i
+            ),
+            filename=join(
+                abspath(
+                    'C:\\Users\\Administrator\\Documents\\ixigua'
+                ),
+                str(
+                    i
+                )+'_comment.txt' 
+            )
+        )
+    finally:
+        sleep(99)
+        continue
